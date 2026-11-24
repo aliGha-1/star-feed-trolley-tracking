@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import {
-  Plus, Search, Edit, Trash2, RefreshCw, Truck, X
+  Plus, Search, Edit, Trash2, RefreshCw, Truck, X, Calendar
 } from 'lucide-react';
 
 const emptyForm = {
@@ -21,19 +21,84 @@ const emptyForm = {
   notes: ''
 };
 
+const dateFields = [
+  ['deposit_date', 'تاريخ الإيداع'],
+  ['fertilization_date', 'تاريخ الإخصاب'],
+  ['transfer_date', 'تاريخ النقل'],
+  ['hatch_date', 'تاريخ الفقس / الخروج']
+];
+
+function formatDate(value) {
+  if (!value) return '-';
+  const parts = String(value).slice(0, 10).split('-');
+  if (parts.length !== 3) return value;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function DateInput({ value, onChange }) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  return (
+    <div className="date-input-wrap" style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={formatDate(value) === '-' ? '' : formatDate(value)}
+        placeholder="يوم/شهر/سنة"
+        readOnly
+        onClick={() => setShowPicker(!showPicker)}
+        style={{ cursor: 'pointer', direction: 'ltr', textAlign: 'right' }}
+      />
+
+      <button
+        type="button"
+        onClick={() => setShowPicker(!showPicker)}
+        style={{
+          position: 'absolute',
+          left: '10px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          border: 0,
+          background: 'transparent',
+          color: '#168568',
+          cursor: 'pointer'
+        }}
+      >
+        <Calendar size={18} />
+      </button>
+
+      {showPicker && (
+        <input
+          type="date"
+          autoFocus
+          value={value || ''}
+          onChange={e => {
+            onChange(e.target.value);
+            setShowPicker(false);
+          }}
+          onBlur={() => setShowPicker(false)}
+          style={{
+            position: 'absolute',
+            top: '48px',
+            right: 0,
+            zIndex: 20,
+            width: '100%',
+            background: '#fff'
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 const fields = [
   ['trolley_code', 'كود العربة', true],
   ['farm_name', 'اسم المزرعة'],
   ['importer', 'المستورد'],
   ['source', 'المصدر'],
   ['egg_count', 'عدد البيض', false, 'number'],
-  ['deposit_date', 'تاريخ الإيداع', false, 'date'],
-  ['fertilization_date', 'تاريخ الإخصاب', false, 'date'],
   ['setter_machine', 'ماكينة التفريخ'],
   ['setter_side', 'رقم / جانب الماكينة'],
-  ['transfer_date', 'تاريخ النقل', false, 'date'],
-  ['hatcher_machine', 'ماكينة الفقس'],
-  ['hatch_date', 'تاريخ الفقس / الخروج', false, 'date']
+  ['hatcher_machine', 'ماكينة الفقس']
 ];
 
 export default function Trolleys({ user, role }) {
@@ -120,17 +185,12 @@ export default function Trolleys({ user, role }) {
     let result;
 
     if (editingId) {
-      result = await supabase
-        .from('trolleys')
-        .update(payload)
-        .eq('id', editingId);
+      result = await supabase.from('trolleys').update(payload).eq('id', editingId);
     } else {
-      result = await supabase
-        .from('trolleys')
-        .insert({
-          ...payload,
-          created_by: user.id
-        });
+      result = await supabase.from('trolleys').insert({
+        ...payload,
+        created_by: user.id
+      });
     }
 
     setSaving(false);
@@ -156,10 +216,7 @@ export default function Trolleys({ user, role }) {
 
     if (!confirmed) return;
 
-    const { error } = await supabase
-      .from('trolleys')
-      .delete()
-      .eq('id', item.id);
+    const { error } = await supabase.from('trolleys').delete().eq('id', item.id);
 
     if (error) {
       setMessage('تعذر الحذف: ' + error.message);
@@ -254,10 +311,10 @@ export default function Trolleys({ user, role }) {
                       {item.setter_machine || '-'}
                       {item.setter_side ? ` - ${item.setter_side}` : ''}
                     </td>
-                    <td>{item.deposit_date || '-'}</td>
-                    <td>{item.fertilization_date || '-'}</td>
-                    <td>{item.transfer_date || '-'}</td>
-                    <td>{item.hatch_date || '-'}</td>
+                    <td>{formatDate(item.deposit_date)}</td>
+                    <td>{formatDate(item.fertilization_date)}</td>
+                    <td>{formatDate(item.transfer_date)}</td>
+                    <td>{formatDate(item.hatch_date)}</td>
                     <td>{item.current_stage || '-'}</td>
                     <td>
                       {canEdit && (
@@ -317,6 +374,16 @@ export default function Trolleys({ user, role }) {
                       onChange={e => updateField(name, e.target.value)}
                       required={!!required}
                       min={type === 'number' ? '0' : undefined}
+                    />
+                  </label>
+                ))}
+
+                {dateFields.map(([name, label]) => (
+                  <label className="form-field" key={name}>
+                    <span>{label}</span>
+                    <DateInput
+                      value={form[name]}
+                      onChange={value => updateField(name, value)}
                     />
                   </label>
                 ))}
