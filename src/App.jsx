@@ -1,15 +1,120 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Truck, QrCode, Users, FileText,
   Settings, Search, Bell, Egg, ArrowLeftRight,
-  ClipboardList, Menu, ShieldCheck
+  ClipboardList, Menu, ShieldCheck, LogOut
 } from 'lucide-react';
 
+import Auth from './Auth.jsx';
+import { supabase } from './supabase';
+
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [checking, setChecking] = useState(true);
+  const [profileError, setProfileError] = useState('');
   const [activePage, setActivePage] = useState('dashboard');
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const menuItems = [
+  useEffect(() => {
+    if (!supabase) {
+      setChecking(false);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user || null);
+      setChecking(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+        if (!session?.user) {
+          setProfile(null);
+          setProfileError('');
+        }
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+
+    let active = true;
+
+    async function loadProfile() {
+      setProfile(null);
+      setProfileError('');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', user.id)
+        .single();
+
+      if (!active) return;
+
+      if (error || !data) {
+        setProfileError(
+          'تعذر تحميل بيانات المستخدم. تأكد من وجود ملف المستخدم في قاعدة البيانات.'
+        );
+        return;
+      }
+
+      setProfile(data);
+    }
+
+    loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setActivePage('dashboard');
+  };
+
+  if (!supabase) {
+    return <div className="auth-page">إعدادات الاتصال بقاعدة البيانات غير مكتملة.</div>;
+  }
+
+  if (checking) {
+    return <div className="auth-page">جارٍ التحقق من تسجيل الدخول...</div>;
+  }
+
+  if (!user) {
+    return <Auth onLogin={setUser} />;
+  }
+
+  if (profileError) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <h2>تعذر تحميل الحساب</h2>
+          <p>{profileError}</p>
+          <button onClick={handleLogout}>تسجيل الخروج</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return <div className="auth-page">جارٍ تحميل بيانات الحساب...</div>;
+  }
+
+  const isAdmin = profile.role === 'admin';
+
+  const allMenuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'trolleys', label: 'إدارة العربات', icon: Truck },
     { id: 'tracking', label: 'حركة العربات', icon: ArrowLeftRight },
@@ -19,6 +124,13 @@ export default function App() {
     { id: 'logs', label: 'سجل العمليات', icon: ClipboardList },
     { id: 'settings', label: 'الإعدادات', icon: Settings }
   ];
+
+  const menuItems = allMenuItems.filter(item => {
+    if (['users', 'logs', 'settings'].includes(item.id)) {
+      return isAdmin;
+    }
+    return true;
+  });
 
   const currentPage = menuItems.find(item => item.id === activePage);
 
@@ -85,10 +197,22 @@ export default function App() {
             <button className="icon-button">
               <Search size={20} />
             </button>
+
             <button className="icon-button">
               <Bell size={20} />
             </button>
-            <div className="user-avatar">A</div>
+
+            <div className="user-avatar">
+              {(profile.full_name || user.email || 'A').charAt(0).toUpperCase()}
+            </div>
+
+            <button
+              className="icon-button"
+              onClick={handleLogout}
+              title="تسجيل الخروج"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
         </header>
 
@@ -99,7 +223,9 @@ export default function App() {
               <span className="welcome-tag">HATCHERY MANAGEMENT</span>
               <h1>{currentPage?.label || 'لوحة التحكم'}</h1>
               <p>
-                نظام الإدارة الذكي لتتبع عربات البيض ومراحل التفريخ.
+                مرحباً {profile.full_name || user.email}
+                {' — '}
+                {isAdmin ? 'مدير النظام' : profile.role === 'editor' ? 'محرر' : 'مشاهد'}
               </p>
             </div>
             <div className="welcome-icon">
@@ -179,19 +305,19 @@ export default function App() {
                   <div className="system-list">
                     <div>
                       <span>واجهة النظام</span>
-                      <strong className="status">جاهزة للبناء</strong>
+                      <strong className="status">جاهزة</strong>
                     </div>
                     <div>
                       <span>قاعدة البيانات</span>
-                      <strong className="pending">لم يتم الربط</strong>
+                      <strong className="status">متصلة</strong>
                     </div>
                     <div>
                       <span>نظام QR</span>
-                      <strong className="pending">لم يتم الربط</strong>
+                      <strong className="pending">قيد التجهيز</strong>
                     </div>
                     <div>
-                      <span>المستخدمين</span>
-                      <strong className="pending">لم يتم الربط</strong>
+                      <span>المستخدم الحالي</span>
+                      <strong className="status">مسجل الدخول</strong>
                     </div>
                   </div>
                 </div>
@@ -249,7 +375,7 @@ export default function App() {
           )}
 
           <footer className="app-footer">
-            STAR FEED EL-TOUKHY © 2026
+            STAR FEED EL-TOUKHY ©️ 2026
             <span>Hatchery Trolley Tracking System</span>
           </footer>
 
