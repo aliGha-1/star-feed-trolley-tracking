@@ -1,24 +1,40 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import {
-  Plus, Search, Edit, Trash2, X, RefreshCw, Truck
+  Plus, Search, Edit, Trash2, RefreshCw, Truck, X
 } from 'lucide-react';
 
 const emptyForm = {
   trolley_code: '',
-  flock_code: '',
   farm_name: '',
   importer: '',
   source: '',
   egg_count: '',
   deposit_date: '',
+  fertilization_date: '',
   setter_machine: '',
   setter_side: '',
   transfer_date: '',
   hatcher_machine: '',
+  hatch_date: '',
   current_stage: 'داخل التفريخ',
   notes: ''
 };
+
+const fields = [
+  ['trolley_code', 'كود العربة', true],
+  ['farm_name', 'اسم المزرعة'],
+  ['importer', 'المستورد'],
+  ['source', 'المصدر'],
+  ['egg_count', 'عدد البيض', false, 'number'],
+  ['deposit_date', 'تاريخ الإيداع', false, 'date'],
+  ['fertilization_date', 'تاريخ الإخصاب', false, 'date'],
+  ['setter_machine', 'ماكينة التفريخ'],
+  ['setter_side', 'رقم / جانب الماكينة'],
+  ['transfer_date', 'تاريخ النقل', false, 'date'],
+  ['hatcher_machine', 'ماكينة الفقس'],
+  ['hatch_date', 'تاريخ الفقس / الخروج', false, 'date']
+];
 
 export default function Trolleys({ user, role }) {
   const [trolleys, setTrolleys] = useState([]);
@@ -45,7 +61,6 @@ export default function Trolleys({ user, role }) {
     } else {
       setTrolleys(data || []);
     }
-
     setLoading(false);
   }
 
@@ -59,7 +74,7 @@ export default function Trolleys({ user, role }) {
 
   function openNewForm() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm });
     setMessage('');
     setShowForm(true);
   }
@@ -71,7 +86,9 @@ export default function Trolleys({ user, role }) {
       ...item,
       egg_count: item.egg_count ?? '',
       deposit_date: item.deposit_date || '',
-      transfer_date: item.transfer_date || ''
+      fertilization_date: item.fertilization_date || '',
+      transfer_date: item.transfer_date || '',
+      hatch_date: item.hatch_date || ''
     });
     setMessage('');
     setShowForm(true);
@@ -84,16 +101,17 @@ export default function Trolleys({ user, role }) {
 
     const payload = {
       trolley_code: form.trolley_code.trim(),
-      flock_code: form.flock_code.trim() || null,
       farm_name: form.farm_name.trim() || null,
       importer: form.importer.trim() || null,
       source: form.source.trim() || null,
       egg_count: form.egg_count === '' ? null : Number(form.egg_count),
       deposit_date: form.deposit_date || null,
+      fertilization_date: form.fertilization_date || null,
       setter_machine: form.setter_machine.trim() || null,
       setter_side: form.setter_side.trim() || null,
       transfer_date: form.transfer_date || null,
       hatcher_machine: form.hatcher_machine.trim() || null,
+      hatch_date: form.hatch_date || null,
       current_stage: form.current_stage,
       notes: form.notes.trim() || null,
       updated_by: user.id
@@ -123,7 +141,7 @@ export default function Trolleys({ user, role }) {
     }
 
     setShowForm(false);
-    setForm(emptyForm);
+    setForm({ ...emptyForm });
     setEditingId(null);
     setMessage('تم حفظ بيانات العربة بنجاح');
     await loadTrolleys();
@@ -154,289 +172,196 @@ export default function Trolleys({ user, role }) {
   const filtered = trolleys.filter(item => {
     const text = [
       item.trolley_code,
-      item.flock_code,
       item.farm_name,
-      item.setter_machine
+      item.importer,
+      item.source,
+      item.setter_machine,
+      item.hatcher_machine
     ].join(' ').toLowerCase();
 
     return text.includes(search.toLowerCase());
   });
 
-  const fields = [
-    ['trolley_code', 'كود العربة', true],
-    ['flock_code', 'كود القطيع'],
-    ['farm_name', 'اسم المزرعة'],
-    ['importer', 'المستورد'],
-    ['source', 'المصدر'],
-    ['egg_count', 'عدد البيض', false, 'number'],
-    ['deposit_date', 'تاريخ الإيداع', false, 'date'],
-    ['setter_machine', 'ماكينة التفريخ'],
-    ['setter_side', 'جانب الماكينة'],
-    ['transfer_date', 'تاريخ النقل', false, 'date'],
-    ['hatcher_machine', 'ماكينة الفقس']
-  ];
-
-  const inputStyle = {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #d7dee8',
-    borderRadius: '9px',
-    fontSize: '14px',
-    background: '#fff',
-    boxSizing: 'border-box'
-  };
-
-  const buttonStyle = {
-    border: 'none',
-    borderRadius: '9px',
-    padding: '11px 16px',
-    cursor: 'pointer',
-    fontWeight: 'bold'
-  };
-
   return (
-    <div style={{ direction: 'rtl', padding: '4px' }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '12px',
-        marginBottom: '20px'
-      }}>
+    <div className="page-content">
+      <div className="page-header">
         <div>
-          <h2 style={{ margin: '0 0 6px' }}>إدارة العربات</h2>
-          <p style={{ margin: 0, color: '#718096' }}>
-            تسجيل ومتابعة بيانات عربات التفريخ
-          </p>
+          <h2>إدارة العربات</h2>
+          <p>إضافة ومتابعة بيانات عربات البيض ومواعيد التفريخ</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={loadTrolleys}
-            style={{ ...buttonStyle, background: '#e8eef6', color: '#24364b' }}
-          >
-            <RefreshCw size={16} />
+        {canEdit && (
+          <button className="primary-btn" onClick={openNewForm}>
+            <Plus size={18} />
+            إضافة عربة جديدة
           </button>
-
-          {canEdit && (
-            <button
-              onClick={openNewForm}
-              style={{ ...buttonStyle, background: '#123c63', color: '#fff' }}
-            >
-              <Plus size={17} /> إضافة عربة
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        background: '#fff',
-        padding: '12px',
-        borderRadius: '12px',
-        border: '1px solid #e5eaf0',
-        marginBottom: '16px'
-      }}>
-        <Search size={19} color="#718096" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="ابحث بكود العربة أو القطيع أو المزرعة..."
-          style={{ ...inputStyle, border: 'none', outline: 'none' }}
-        />
-      </div>
-
-      {message && (
-        <div style={{
-          padding: '12px',
-          marginBottom: '14px',
-          background: '#eef5ff',
-          borderRadius: '9px',
-          color: '#17436b'
-        }}>
-          {message}
-        </div>
-      )}
-
-      <div style={{
-        background: '#fff',
-        border: '1px solid #e5eaf0',
-        borderRadius: '12px',
-        overflowX: 'auto'
-      }}>
-        {loading ? (
-          <p style={{ padding: '25px', textAlign: 'center' }}>
-            جارٍ تحميل العربات...
-          </p>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '40px 15px', textAlign: 'center' }}>
-            <Truck size={38} color="#94a3b8" />
-            <h3>لا توجد عربات مسجلة</h3>
-            <p style={{ color: '#718096' }}>
-              أضف أول عربة لتبدأ استخدام النظام.
-            </p>
-          </div>
-        ) : (
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            minWidth: '750px',
-            textAlign: 'right'
-          }}>
-            <thead>
-              <tr style={{ background: '#f3f6fa' }}>
-                {['كود العربة', 'كود القطيع', 'المزرعة', 'عدد البيض', 'المرحلة', 'الإجراءات'].map(title => (
-                  <th key={title} style={{ padding: '14px', whiteSpace: 'nowrap' }}>
-                    {title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(item => (
-                <tr key={item.id} style={{ borderTop: '1px solid #edf0f4' }}>
-                  <td style={{ padding: '13px', fontWeight: 'bold' }}>
-                    {item.trolley_code}
-                  </td>
-                  <td style={{ padding: '13px' }}>{item.flock_code || '-'}</td>
-                  <td style={{ padding: '13px' }}>{item.farm_name || '-'}</td>
-                  <td style={{ padding: '13px' }}>{item.egg_count ?? '-'}</td>
-                  <td style={{ padding: '13px' }}>{item.current_stage || '-'}</td>
-                  <td style={{ padding: '13px', whiteSpace: 'nowrap' }}>
-                    {canEdit && (
-                      <button
-                        onClick={() => openEditForm(item)}
-                        style={{ ...buttonStyle, background: '#eaf2ff', color: '#245b91', marginLeft: '6px' }}
-                        title="تعديل"
-                      >
-                        <Edit size={16} />
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button
-                        onClick={() => deleteTrolley(item)}
-                        style={{ ...buttonStyle, background: '#fff0f0', color: '#bd3030' }}
-                        title="حذف"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         )}
       </div>
 
-      <p style={{ color: '#718096', marginTop: '12px' }}>
-        إجمالي العربات: {trolleys.length}
-      </p>
+      {message && <div className="notice">{message}</div>}
+
+      <div className="panel">
+        <div className="toolbar">
+          <div className="search-box">
+            <Search size={18} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="ابحث بكود العربة أو المزرعة أو الماكينة..."
+            />
+          </div>
+
+          <button className="secondary-btn" onClick={loadTrolleys}>
+            <RefreshCw size={17} />
+            تحديث
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">جارٍ تحميل العربات...</div>
+        ) : filtered.length === 0 ? (
+          <div className="empty-state">
+            <Truck size={35} />
+            <p>لا توجد عربات مسجلة حتى الآن</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>كود العربة</th>
+                  <th>المزرعة</th>
+                  <th>المستورد</th>
+                  <th>عدد البيض</th>
+                  <th>ماكينة التفريخ</th>
+                  <th>تاريخ الإيداع</th>
+                  <th>تاريخ الإخصاب</th>
+                  <th>تاريخ النقل</th>
+                  <th>تاريخ الفقس</th>
+                  <th>المرحلة</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filtered.map(item => (
+                  <tr key={item.id}>
+                    <td>{item.trolley_code}</td>
+                    <td>{item.farm_name || '-'}</td>
+                    <td>{item.importer || '-'}</td>
+                    <td>{item.egg_count ?? '-'}</td>
+                    <td>
+                      {item.setter_machine || '-'}
+                      {item.setter_side ? ` - ${item.setter_side}` : ''}
+                    </td>
+                    <td>{item.deposit_date || '-'}</td>
+                    <td>{item.fertilization_date || '-'}</td>
+                    <td>{item.transfer_date || '-'}</td>
+                    <td>{item.hatch_date || '-'}</td>
+                    <td>{item.current_stage || '-'}</td>
+                    <td>
+                      {canEdit && (
+                        <button
+                          className="icon-btn"
+                          title="تعديل"
+                          onClick={() => openEditForm(item)}
+                        >
+                          <Edit size={17} />
+                        </button>
+                      )}
+
+                      {isAdmin && (
+                        <button
+                          className="icon-btn danger"
+                          title="حذف"
+                          onClick={() => deleteTrolley(item)}
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {showForm && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 1000,
-          background: 'rgba(10,20,35,.65)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '12px'
-        }}>
-          <div style={{
-            background: '#fff',
-            width: '100%',
-            maxWidth: '720px',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            borderRadius: '15px',
-            padding: '20px'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '18px'
-            }}>
-              <h3>{editingId ? 'تعديل بيانات العربة' : 'إضافة عربة جديدة'}</h3>
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <h2>{editingId ? 'تعديل بيانات العربة' : 'إضافة عربة جديدة'}</h2>
+                <p>أدخل بيانات العربة ومواعيد مراحل التفريخ</p>
+              </div>
+
               <button
+                className="icon-btn"
+                type="button"
                 onClick={() => setShowForm(false)}
-                style={{ ...buttonStyle, background: '#f1f3f6' }}
               >
-                <X size={19} />
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={saveTrolley}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '14px'
-              }}>
+              <div className="form-grid">
                 {fields.map(([name, label, required, type]) => (
-                  <label key={name} style={{ display: 'block' }}>
-                    <span style={{ display: 'block', marginBottom: '7px', fontWeight: 'bold' }}>
-                      {label}{required ? ' *' : ''}
-                    </span>
+                  <label className="form-field" key={name}>
+                    <span>{label}{required ? ' *' : ''}</span>
                     <input
                       type={type || 'text'}
                       value={form[name] ?? ''}
-                      required={!!required}
-                      min={type === 'number' ? 0 : undefined}
                       onChange={e => updateField(name, e.target.value)}
-                      style={inputStyle}
+                      required={!!required}
+                      min={type === 'number' ? '0' : undefined}
                     />
                   </label>
                 ))}
 
-                <label>
-                  <span style={{ display: 'block', marginBottom: '7px', fontWeight: 'bold' }}>
-                    المرحلة الحالية
-                  </span>
+                <label className="form-field">
+                  <span>المرحلة الحالية</span>
                   <select
                     value={form.current_stage}
                     onChange={e => updateField('current_stage', e.target.value)}
-                    style={inputStyle}
                   >
                     <option>داخل التفريخ</option>
-                    <option>في النقل</option>
-                    <option>داخل الفقاسة</option>
-                    <option>تم الفقس</option>
-                    <option>خرجت من التشغيل</option>
+                    <option>تم الإخصاب</option>
+                    <option>تم النقل</option>
+                    <option>داخل ماكينة الفقس</option>
+                    <option>تم الفقس / الخروج</option>
                   </select>
+                </label>
+
+                <label className="form-field full-width">
+                  <span>ملاحظات</span>
+                  <textarea
+                    rows="3"
+                    value={form.notes}
+                    onChange={e => updateField('notes', e.target.value)}
+                  />
                 </label>
               </div>
 
-              <label style={{ display: 'block', marginTop: '15px' }}>
-                <span style={{ display: 'block', marginBottom: '7px', fontWeight: 'bold' }}>
-                  ملاحظات
-                </span>
-                <textarea
-                  value={form.notes || ''}
-                  onChange={e => updateField('notes', e.target.value)}
-                  rows="3"
-                  style={{ ...inputStyle, resize: 'vertical' }}
-                />
-              </label>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setShowForm(false)}
+                >
+                  إلغاء
+                </button>
 
-              <button
-                type="submit"
-                disabled={saving}
-                style={{
-                  ...buttonStyle,
-                  width: '100%',
-                  marginTop: '18px',
-                  background: '#123c63',
-                  color: '#fff',
-                  opacity: saving ? 0.6 : 1
-                }}
-              >
-                {saving ? 'جارٍ الحفظ...' : editingId ? 'حفظ التعديلات' : 'حفظ العربة'}
-              </button>
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  disabled={saving}
+                >
+                  {saving ? 'جارٍ الحفظ...' : 'حفظ بيانات العربة'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
