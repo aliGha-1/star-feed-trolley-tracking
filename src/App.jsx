@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 import Auth from './Auth.jsx';
+import Trolleys from './Trolleys.jsx';
 import { supabase } from './supabase';
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user || null);
+
         if (!session?.user) {
           setProfile(null);
           setProfileError('');
@@ -62,7 +64,7 @@ export default function App() {
 
       if (error || !data) {
         setProfileError(
-          'تعذر تحميل بيانات المستخدم. تأكد من وجود ملف المستخدم في قاعدة البيانات.'
+          'تعذر تحميل بيانات المستخدم. يرجى مراجعة حسابك.'
         );
         return;
       }
@@ -77,12 +79,12 @@ export default function App() {
     };
   }, [user]);
 
-  const handleLogout = async () => {
+  async function handleLogout() {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setActivePage('dashboard');
-  };
+  }
 
   if (!supabase) {
     return <div className="auth-page">إعدادات الاتصال بقاعدة البيانات غير مكتملة.</div>;
@@ -113,24 +115,20 @@ export default function App() {
   }
 
   const isAdmin = profile.role === 'admin';
+  const canEdit = isAdmin || profile.role === 'editor';
 
-  const allMenuItems = [
+  const menuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'trolleys', label: 'إدارة العربات', icon: Truck },
     { id: 'tracking', label: 'حركة العربات', icon: ArrowLeftRight },
     { id: 'qr', label: 'QR Codes', icon: QrCode },
-    { id: 'users', label: 'المستخدمين', icon: Users },
-    { id: 'reports', label: 'التقارير', icon: FileText },
-    { id: 'logs', label: 'سجل العمليات', icon: ClipboardList },
-    { id: 'settings', label: 'الإعدادات', icon: Settings }
+    ...(isAdmin ? [
+      { id: 'users', label: 'المستخدمين', icon: Users },
+      { id: 'logs', label: 'سجل العمليات', icon: ClipboardList },
+      { id: 'settings', label: 'الإعدادات', icon: Settings }
+    ] : []),
+    { id: 'reports', label: 'التقارير', icon: FileText }
   ];
-
-  const menuItems = allMenuItems.filter(item => {
-    if (['users', 'logs', 'settings'].includes(item.id)) {
-      return isAdmin;
-    }
-    return true;
-  });
 
   const currentPage = menuItems.find(item => item.id === activePage);
 
@@ -153,6 +151,7 @@ export default function App() {
         <nav>
           {menuItems.map(item => {
             const Icon = item.icon;
+
             return (
               <button
                 key={item.id}
@@ -225,15 +224,18 @@ export default function App() {
               <p>
                 مرحباً {profile.full_name || user.email}
                 {' — '}
-                {isAdmin ? 'مدير النظام' : profile.role === 'editor' ? 'محرر' : 'مشاهد'}
+                {isAdmin ? 'مدير النظام' : canEdit ? 'محرر' : 'مشاهد'}
               </p>
             </div>
+
             <div className="welcome-icon">
               <Egg size={36} />
             </div>
           </div>
 
-          {activePage === 'dashboard' ? (
+          {activePage === 'trolleys' ? (
+            <Trolleys user={user} role={profile.role} />
+          ) : activePage === 'dashboard' ? (
             <>
               <div className="stats-grid">
 
@@ -360,11 +362,14 @@ export default function App() {
               <div className="placeholder-icon">
                 {currentPage && <currentPage.icon size={36} />}
               </div>
-              <h2>{currentPage?.label}</h2>
+
+              <h2>{currentPage?.label || 'القسم غير متاح'}</h2>
+
               <p>
                 هذا القسم تم تجهيزه ضمن هيكل النظام.
                 سيتم بناء وظائفه وربطه بقاعدة البيانات في المراحل القادمة.
               </p>
+
               <button
                 className="back-button"
                 onClick={() => setActivePage('dashboard')}
