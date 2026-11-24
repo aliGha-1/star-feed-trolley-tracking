@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from './supabase';
 
+const ADMIN_EMAIL = 'a17395314@gmail.com';
+
 export default function Auth({ onLogin }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -12,15 +14,19 @@ export default function Auth({ onLogin }) {
     setError('');
     setLoading(true);
 
+    const email = username.trim().toLowerCase() === 'admin'
+      ? ADMIN_EMAIL
+      : `${username.trim().toLowerCase()}@starfeed.local`;
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email,
       password
     });
 
     setLoading(false);
 
     if (error) {
-      setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+      setError('اسم المستخدم أو كلمة المرور غير صحيحة');
       return;
     }
 
@@ -30,15 +36,15 @@ export default function Auth({ onLogin }) {
   return (
     <div className="auth-page">
       <form className="auth-card" onSubmit={handleLogin}>
-        <h1>Star Feed El-Toukhy</h1>
+        <h1>STAR FEED</h1>
         <p>نظام تتبع عربات التفريخ</p>
 
-        <label>البريد الإلكتروني</label>
+        <label>اسم المستخدم</label>
         <input
-          type="email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          placeholder="أدخل البريد الإلكتروني"
+          type="text"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          placeholder="admin"
           required
         />
 
@@ -47,14 +53,14 @@ export default function Auth({ onLogin }) {
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
-          placeholder="أدخل كلمة المرور"
+          placeholder="كلمة المرور"
           required
         />
 
         {error && <p className="auth-error">{error}</p>}
 
         <button type="submit" disabled={loading}>
-          {loading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول'}
+          {loading ? 'جارٍ الدخول...' : 'تسجيل الدخول'}
         </button>
       </form>
     </div>
